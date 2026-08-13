@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glowing Spirit Dragon & Floating Temple</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #020108;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(160, 230, 255, 0.85);
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            pointer-events: none;
+            background: rgba(5, 15, 30, 0.5);
+            padding: 8px 18px;
+            border-radius: 20px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 235, 255, 0.2);
+            text-shadow: 0 0 8px rgba(0, 235, 255, 0.6);
+            z-index: 10;
+        }
+
+        #audio-btn {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 235, 255, 0.15);
+            border: 1px solid rgba(0, 235, 255, 0.5);
+            color: #a0e6ff;
+            padding: 10px 22px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        #audio-btn:hover {
+            background: rgba(0, 235, 255, 0.35);
+            box-shadow: 0 0 15px rgba(0, 235, 255, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui">🐉 Spirit Dragon & Floating Crystal Sanctuary ✦ Orbit to View</div>
+    <button id="audio-btn">🎤 Enable Audio Reactivity</button>
+
+    <!-- Three.js & Post-Processing Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <script>
+        // --- CONSTANTS & BOUNDS ---
+        const MAX_PETALS = 2500;
+        const MAX_FIREFLIES = 500;
+        const DRAGON_SEGMENTS = 140;
+        const PARTICLES_PER_SEGMENT = 18;
+
+        // --- 1. SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020514, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 28);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.maxPolarAngle = Math.PI / 2 + 0.05;
+        controls.minDistance = 8;
+        controls.maxDistance = 50;
+        controls.target.set(0, 1, 0);
+
+        // --- 2. UNREAL BLOOM POST-PROCESSING ---
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            2.2,  // Bloom Strength
+            0.5,  // Radius
+            0.1   // Threshold
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- 3. FLOATING CRYSTAL ISLAND & TEMPLE ---
+        const islandGroup = new THREE.Group();
+
+        // Main Island Rock Mesh
+        const islandGeo = new THREE.ConeGeometry(7, 6, 7);
+        islandGeo.rotateX(Math.PI);
+        const islandMat = new THREE.MeshStandardMaterial({
+            color: 0x111e2e,
+            roughness: 0.8,
+            flatShading: true
+        });
+        const islandMesh = new THREE.Mesh(islandGeo, islandMat);
+        islandMesh.position.y = -3;
+        islandGroup.add(islandMesh);
+
+        // Floating Crystals on top
+        const crystalGroup = new THREE.Group();
+        const crystalGeo = new THREE.OctahedronGeometry(1.2, 0);
+        const crystalMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        for (let i = 0; i < 5; i++) {
+            const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+            const angle = (i / 5) * Math.PI * 2;
+            crystal.position.set(Math.cos(angle) * 3, 0.5 + Math.random() * 0.5, Math.sin(angle) * 3);
+            crystal.scale.set(0.8, 1.8, 0.8);
+            crystalGroup.add(crystal);
+        }
+        islandGroup.add(crystalGroup);
+
+        // Center Core Crystal (Audio Reactive Target)
+        const coreGeo = new THREE.OctahedronGeometry(2.2, 0);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+        const coreCrystal = new THREE.Mesh(coreGeo, coreMat);
+        coreCrystal.position.set(0, 1.5, 0);
+        islandGroup.add(coreCrystal);
+
+        scene.add(islandGroup);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0x0a1526, 2);
+        scene.add(ambientLight);
+
+        const crystalLight = new THREE.PointLight(0x00ffff, 4, 18);
+        crystalLight.position.set(0, 2, 0);
+        scene.add(crystalLight);
+
+        // --- 4. SERPENTINE SPIRIT DRAGON (PARTICLE SYSTEM) ---
+        const totalDragonParticles = DRAGON_SEGMENTS * PARTICLES_PER_SEGMENT;
+        const dragonGeo = new THREE.BufferGeometry();
+        const dragonPositions = new Float32Array(totalDragonParticles * 3);
+        const dragonColors = new Float32Array(totalDragonParticles * 3);
+
+        const dragonColorHead = new THREE.Color(0xffffff);
+        const dragonColorBody = new THREE.Color(0x00e5ff);
+        const dragonColorTail = new THREE.Color(0xff00aa);
+
+        for (let i = 0; i < DRAGON_SEGMENTS; i++) {
+            const t = i / DRAGON_SEGMENTS;
+            let segmentColor = new THREE.Color();
+            if (t < 0.1) segmentColor.copy(dragonColorHead);
+            else if (t < 0.7) segmentColor.copy(dragonColorBody).lerp(dragonColorTail, (t - 0.1) / 0.6);
+            else segmentColor.copy(dragonColorTail);
+
+            for (let j = 0; j < PARTICLES_PER_SEGMENT; j++) {
+                const idx = (i * PARTICLES_PER_SEGMENT + j) * 3;
+                dragonPositions[idx] = 0;
+                dragonPositions[idx + 1] = 0;
+                dragonPositions[idx + 2] = 0;
+
+                dragonColors[idx] = segmentColor.r;
+                dragonColors[idx + 1] = segmentColor.g;
+                dragonColors[idx + 2] = segmentColor.b;
+            }
+        }
+
+        dragonGeo.setAttribute('position', new THREE.BufferAttribute(dragonPositions, 3));
+        dragonGeo.setAttribute('color', new THREE.BufferAttribute(dragonColors, 3));
+
+        const dragonMat = new THREE.PointsMaterial({
+            size: 0.35,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+
+        const dragonParticles = new THREE.Points(dragonGeo, dragonMat);
+        scene.add(dragonParticles);
+
+        // Dragon Spine Curve Interpolation Points
+        const spineHistory = Array.from({ length: DRAGON_SEGMENTS }, () => new THREE.Vector3());
+
+        // --- 5. FLOATING PETALS & FIREFLIES ---
+        // Petals
+        const petalGeo = new THREE.BufferGeometry();
+        const petalPos = new Float32Array(MAX_PETALS * 3);
+        for (let i = 0; i < MAX_PETALS; i++) {
+            petalPos[i * 3] = (Math.random() - 0.5) * 35;
+            petalPos[i * 3 + 1] = Math.random() * 20 - 5;
+            petalPos[i * 3 + 2] = (Math.random() - 0.5) * 35;
+        }
+        petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+        const petals = new THREE.Points(petalGeo, new THREE.PointsMaterial({
+            color: 0xff77aa,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        }));
+        scene.add(petals);
+
+        // Fireflies
+        const fireflyGeo = new THREE.BufferGeometry();
+        const fireflyPos = new Float32Array(MAX_FIREFLIES * 3);
+        for (let i = 0; i < MAX_FIREFLIES; i++) {
+            fireflyPos[i * 3] = (Math.random() - 0.5) * 25;
+            fireflyPos[i * 3 + 1] = Math.random() * 12 - 2;
+            fireflyPos[i * 3 + 2] = (Math.random() - 0.5) * 25;
+        }
+        fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+        const fireflies = new THREE.Points(fireflyGeo, new THREE.PointsMaterial({
+            color: 0x00ffff,
+            size: 0.25,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        }));
+        scene.add(fireflies);
+
+        // --- 6. AUDIO ANALYZER SETUP ---
+        let audioContext, analyser, dataArray;
+        let isAudioActive = false;
+
+        document.getElementById('audio-btn').addEventListener('click', async () => {
+            if (isAudioActive) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 64;
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                isAudioActive = true;
+                document.getElementById('audio-btn').innerText = "🔊 Audio Reactive Active";
+            } catch (err) {
+                alert("Microphone access blocked or unavailable. Falling back to synthetic pulse.");
+            }
+        });
+
+        // --- 7. ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            controls.update();
+
+            // Audio Intensity calculation
+            let audioIntensity = 0;
+            if (isAudioActive && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                audioIntensity = (sum / dataArray.length) / 255; // 0.0 to 1.0
+            } else {
+                audioIntensity = (Math.sin(time * 3) + 1) * 0.25; // Synthetic pulse
+            }
+
+            // Animate Core Crystal Pulse
+            coreCrystal.scale.setScalar(1 + audioIntensity * 0.8);
+            coreCrystal.rotation.y = time * 0.8;
+            crystalLight.intensity = 3 + audioIntensity * 8;
+
+            // Animate Floating Island Hover
+            islandGroup.position.y = Math.sin(time * 0.8) * 0.4;
+            crystalGroup.rotation.y = -time * 0.3;
+
+            // Compute Dragon Head Position in 3D Infinity Path (Lissajous Loop)
+            const headX = Math.sin(time * 0.9) * 12;
+            const headY = Math.sin(time * 1.8) * 4 + 3;
+            const headZ = Math.cos(time * 0.9) * 12;
+            const currentHeadPos = new THREE.Vector3(headX, headY, headZ);
+
+            // Shift Dragon Spine History
+            spineHistory.unshift(currentHeadPos.clone());
+            if (spineHistory.length > DRAGON_SEGMENTS) spineHistory.pop();
+
+            // Update Dragon Particle Cloud along the Spine
+            const dPos = dragonParticles.geometry.attributes.position.array;
+            for (let i = 0; i < spineHistory.length; i++) {
+                const pos = spineHistory[i];
+                const radius = Math.sin((i / DRAGON_SEGMENTS) * Math.PI) * 1.2 + 0.2;
+
+                for (let j = 0; j < PARTICLES_PER_SEGMENT; j++) {
+                    const idx = (i * PARTICLES_PER_SEGMENT + j) * 3;
+                    const angle = (j / PARTICLES_PER_SEGMENT) * Math.PI * 2 + time * 4;
+
+                    dPos[idx] = pos.x + Math.cos(angle) * radius * (0.8 + Math.random() * 0.4);
+                    dPos[idx + 1] = pos.y + Math.sin(angle) * radius * (0.8 + Math.random() * 0.4);
+                    dPos[idx + 2] = pos.z + Math.sin(angle * 2) * radius * 0.5;
+                }
+            }
+            dragonParticles.geometry.attributes.position.needsUpdate = true;
+
+            // Animate Petals Falling
+            const pArr = petals.geometry.attributes.position.array;
+            for (let i = 0; i < MAX_PETALS; i++) {
+                pArr[i * 3 + 1] -= 0.03 + audioIntensity * 0.05; // Fall speed
+                pArr[i * 3] += Math.sin(time + i) * 0.02; // Sway
+
+                if (pArr[i * 3 + 1] < -6) {
+                    pArr[i * 3 + 1] = 18;
+                    pArr[i * 3] = (Math.random() - 0.5) * 35;
+                    pArr[i * 3 + 2] = (Math.random() - 0.5) * 35;
+                }
+            }
+            petals.geometry.attributes.position.needsUpdate = true;
+
+            // Animate Fireflies Floating
+            const fArr = fireflies.geometry.attributes.position.array;
+            for (let i = 0; i < MAX_FIREFLIES; i++) {
+                fArr[i * 3] += Math.cos(time + i) * 0.015;
+                fArr[i * 3 + 1] += Math.sin(time * 1.5 + i) * 0.01;
+                fArr[i * 3 + 2] += Math.sin(time + i) * 0.015;
+            }
+            fireflies.geometry.attributes.position.needsUpdate = true;
+
+            composer.render();
+        }
+
+        animate();
+
+        // Handle Window Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glowing Cherry Blossom Tree</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #030108;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 183, 197, 0.7);
+            font-size: 14px;
+            pointer-events: none;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="overlay">✨ Glowing Cherry Blossom Scene | Drag to rotate</div>
+
+    <!-- Three.js and Post-Processing Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <script>
+        // --- 1. SCENE & CAMERA SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030108, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 6, 18);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go far below ground
+        controls.minDistance = 5;
+        controls.maxDistance = 30;
+        controls.target.set(0, 5, 0);
+
+        // --- 2. POST-PROCESSING (NEON BLOOM EFFECT) ---
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.8,  // Bloom Strength
+            0.4,  // Radius
+            0.15  // Threshold (Lower = glows more)
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- 3. RECURSIVE TREE GENERATION (PARTICLE-BASED) ---
+        const treePoints = [];
+        const treeColors = [];
+
+        // Colors
+        const trunkColor = new THREE.Color(0xffaa55); // Warm golden trunk
+        const blossomColor = new THREE.Color(0xff44aa); // Vivid pink blossoms
+        const blossomLightColor = new THREE.Color(0xffb7c5); // Soft highlight pink
+
+        function generateBranch(start, length, radius, angleX, angleY, depth) {
+            const end = new THREE.Vector3(
+                start.x + length * Math.sin(angleX) * Math.cos(angleY),
+                start.y + length * Math.cos(angleX),
+                start.z + length * Math.sin(angleX) * Math.sin(angleY)
+            );
+
+            // Populate points along the branch
+            const steps = Math.floor(length * 20);
+            for (let i = 0; i < steps; i++) {
+                const t = i / steps;
+                const p = new THREE.Vector3().lerpVectors(start, end, t);
+
+                // Add random volume radius
+                const r = radius * (1 - t) * (0.8 + Math.random() * 0.4);
+                p.x += (Math.random() - 0.5) * r;
+                p.y += (Math.random() - 0.5) * r;
+                p.z += (Math.random() - 0.5) * r;
+
+                treePoints.push(p.x, p.y, p.z);
+
+                // Blend colors from trunk to blossom ends
+                let col = new THREE.Color();
+                if (depth < 2) {
+                    col.copy(trunkColor).lerp(blossomColor, depth / 2);
+                } else {
+                    col.copy(blossomColor).lerp(blossomLightColor, Math.random());
+                }
+                treeColors.push(col.r, col.g, col.b);
+            }
+
+            // Create sub-branches or terminal blossom clouds
+            if (depth < 5) {
+                const numBranches = Math.floor(Math.random() * 2) + 2;
+                for (let b = 0; b < numBranches; b++) {
+                    const nextAngleX = angleX + (Math.random() - 0.3) * 0.8;
+                    const nextAngleY = angleY + (Math.random() - 0.5) * 1.5;
+                    generateBranch(end, length * 0.72, radius * 0.65, nextAngleX, nextAngleY, depth + 1);
+                }
+            } else {
+                // Dense blossom cluster at the branch tips
+                for (let p = 0; p < 40; p++) {
+                    const bp = new THREE.Vector3(
+                        end.x + (Math.random() - 0.5) * 1.8,
+                        end.y + (Math.random() - 0.5) * 1.8,
+                        end.z + (Math.random() - 0.5) * 1.8
+                    );
+                    treePoints.push(bp.x, bp.y, bp.z);
+                    const col = blossomColor.clone().lerp(blossomLightColor, Math.random());
+                    treeColors.push(col.r, col.g, col.b);
+                }
+            }
+        }
+
+        // Build the tree starting from origin
+        generateBranch(new THREE.Vector3(0, 0, 0), 4.5, 0.8, 0, 0, 0);
+
+        const treeGeo = new THREE.BufferGeometry();
+        treeGeo.setAttribute('position', new THREE.Float32BufferAttribute(treePoints, 3));
+        treeGeo.setAttribute('color', new THREE.Float32BufferAttribute(treeColors, 3));
+
+        const treeMat = new THREE.PointsMaterial({
+            size: 0.12,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending
+        });
+
+        const tree = new THREE.Points(treeGeo, treeMat);
+        scene.add(tree);
+
+        // --- 4. GROUND GLOW FIELD ---
+        const groundCount = 2500;
+        const groundPositions = [];
+        const groundColors = [];
+
+        for (let i = 0; i < groundCount; i++) {
+            const rad = Math.random() * 14;
+            const theta = Math.random() * Math.PI * 2;
+            groundPositions.push(rad * Math.cos(theta), (Math.random() - 0.5) * 0.2, rad * Math.sin(theta));
+
+            const gCol = blossomColor.clone().lerp(new THREE.Color(0x440088), Math.random());
+            groundColors.push(gCol.r, gCol.g, gCol.b);
+        }
+
+        const groundGeo = new THREE.BufferGeometry();
+        groundGeo.setAttribute('position', new THREE.Float32BufferAttribute(groundPositions, 3));
+        groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(groundColors, 3));
+
+        const groundMat = new THREE.PointsMaterial({
+            size: 0.1,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+
+        scene.add(new THREE.Points(groundGeo, groundMat));
+
+        // --- 5. FALLING PETALS SYSTEM ---
+        const petalCount = 800;
+        const petalGeo = new THREE.BufferGeometry();
+        const petalPos = new Float32Array(petalCount * 3);
+        const petalVel = [];
+
+        for (let i = 0; i < petalCount; i++) {
+            petalPos[i * 3] = (Math.random() - 0.5) * 20;
+            petalPos[i * 3 + 1] = Math.random() * 12 + 1;
+            petalPos[i * 3 + 2] = (Math.random() - 0.5) * 20;
+
+            petalVel.push({
+                y: Math.random() * 0.02 + 0.01,
+                x: Math.random() * 0.01 - 0.005,
+                swaySpeed: Math.random() * 2 + 1
+            });
+        }
+
+        petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+
+        const petalMat = new THREE.PointsMaterial({
+            color: 0xffb7c5,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+
+        const petals = new THREE.Points(petalGeo, petalMat);
+        scene.add(petals);
+
+        // --- 6. GLOWING BUTTERFLIES ---
+        const butterflyCount = 3;
+        const butterflies = [];
+
+        for (let i = 0; i < butterflyCount; i++) {
+            const group = new THREE.Group();
+
+            // Wing Geometry
+            const wingGeo = new THREE.PlaneGeometry(0.3, 0.4);
+            const wingMat = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            const leftWing = new THREE.Mesh(wingGeo, wingMat);
+            leftWing.position.x = -0.15;
+            const rightWing = new THREE.Mesh(wingGeo, wingMat);
+            rightWing.position.x = 0.15;
+
+            group.add(leftWing, rightWing);
+            scene.add(group);
+
+            butterflies.push({
+                group: group,
+                leftWing: leftWing,
+                rightWing: rightWing,
+                angle: Math.random() * Math.PI * 2,
+                speed: 0.8 + Math.random() * 0.5,
+                radius: 3 + Math.random() * 4,
+                yOffset: 3 + Math.random() * 4
+            });
+        }
+
+        // --- 7. ANIMATION LOOP ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            // Update Controls
+            controls.update();
+
+            // Animate Petals
+            const positions = petals.geometry.attributes.position.array;
+            for (let i = 0; i < petalCount; i++) {
+                positions[i * 3 + 1] -= petalVel[i].y; // Falling
+                positions[i * 3] += Math.sin(time * petalVel[i].swaySpeed + i) * 0.01; // Swaying
+
+                // Reset to top when petal hits ground
+                if (positions[i * 3 + 1] < 0) {
+                    positions[i * 3 + 1] = 12;
+                    positions[i * 3] = (Math.random() - 0.5) * 16;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 16;
+                }
+            }
+            petals.geometry.attributes.position.needsUpdate = true;
+
+            // Animate Butterflies (Flapping + Orbiting)
+            butterflies.forEach((b) => {
+                b.angle += 0.01 * b.speed;
+                b.group.position.x = Math.cos(b.angle) * b.radius;
+                b.group.position.z = Math.sin(b.angle) * b.radius;
+                b.group.position.y = b.yOffset + Math.sin(time * 2 + b.angle) * 0.8;
+
+                // Orient towards movement direction
+                b.group.rotation.y = -b.angle + Math.PI / 2;
+
+                // Wing flap animation
+                const flap = Math.sin(time * 15) * 0.8;
+                b.leftWing.rotation.y = flap;
+                b.rightWing.rotation.y = -flap;
+            });
+
+            // Gentle Tree Swaying
+            tree.rotation.y = Math.sin(time * 0.2) * 0.03;
+
+            // Render with Bloom
+            composer.render();
+        }
+
+        animate();
+
+        // Handle Window Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>

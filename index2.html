@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A breathtaking 3D cherry blossom scene with moonlit sky, falling petals, fireflies, and reflective water.">
+    <title>Moonlit Cherry Blossom — Immersive 3D Scene</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #020010;
+            overflow: hidden;
+            font-family: 'Cormorant Garamond', serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 24px;
+            left: 28px;
+            color: rgba(255, 200, 220, 0.6);
+            font-size: 15px;
+            pointer-events: none;
+            letter-spacing: 2px;
+            font-weight: 300;
+            text-shadow: 0 0 12px rgba(255, 120, 180, 0.3);
+            transition: opacity 3s ease;
+        }
+
+        #overlay.fade {
+            opacity: 0;
+        }
+
+        #vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(2, 0, 16, 0.6) 100%);
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="vignette"></div>
+    <div id="overlay">🌸 Moonlit Cherry Blossom — drag to explore</div>
+
+    <!-- Three.js and Post-Processing Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <script>
+        // ============================================
+        // 1. SCENE, CAMERA & RENDERER
+        // ============================================
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x040010, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.set(8, 7, 16);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.95;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.maxPolarAngle = Math.PI / 2 + 0.05;
+        controls.minPolarAngle = 0.3;
+        controls.minDistance = 6;
+        controls.maxDistance = 35;
+        controls.target.set(0, 4.5, 0);
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.3;
+
+        // ============================================
+        // 2. POST-PROCESSING (BLOOM)
+        // ============================================
+        const renderPass = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.55,   // Strength
+            0.9,   // Radius
+            0.7   // Threshold
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+
+        // ============================================
+        // 3. LIGHTING — Moonlit Atmosphere
+        // ============================================
+        // Ambient: cool blue fill
+        const ambient = new THREE.AmbientLight(0x181830, 0.4);
+        scene.add(ambient);
+
+        // Hemisphere: sky/ground fill
+        const hemiLight = new THREE.HemisphereLight(0x334466, 0x110a18, 0.35);
+        scene.add(hemiLight);
+
+        // Moonlight: directional from upper-right
+        const moonLight = new THREE.DirectionalLight(0x8899bb, 0.5);
+        moonLight.position.set(15, 25, 10);
+        moonLight.castShadow = true;
+        moonLight.shadow.mapSize.width = 2048;
+        moonLight.shadow.mapSize.height = 2048;
+        moonLight.shadow.camera.near = 1;
+        moonLight.shadow.camera.far = 60;
+        moonLight.shadow.camera.left = -20;
+        moonLight.shadow.camera.right = 20;
+        moonLight.shadow.camera.top = 20;
+        moonLight.shadow.camera.bottom = -5;
+        scene.add(moonLight);
+
+        // Warm pink rim fill from below-left
+        const rimLight = new THREE.PointLight(0xff6699, 0.6, 30);
+        rimLight.position.set(-6, 2, -4);
+        scene.add(rimLight);
+
+        // Soft golden uplight at tree base
+        const baseGlow = new THREE.PointLight(0xffaa55, 0.8, 20);
+        baseGlow.position.set(0, 0.5, 2);
+        scene.add(baseGlow);
+
+        // Ground fill light
+        const groundFill = new THREE.PointLight(0x8888cc, 0.7, 22);
+        groundFill.position.set(3, 1, 6);
+        scene.add(groundFill);
+
+        // Second ground fill (opposite side)
+        const groundFill2 = new THREE.PointLight(0x9977bb, 0.5, 18);
+        groundFill2.position.set(-5, 1.5, 4);
+        scene.add(groundFill2);
+
+        // Overhead canopy light
+        const canopyLight = new THREE.PointLight(0xffbbdd, 0.4, 15);
+        canopyLight.position.set(0, 10, 0);
+        scene.add(canopyLight);
+
+        // ============================================
+        // 4. STARFIELD SKY
+        // ============================================
+        const starCount = 3000;
+        const starPositions = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+        const starSizes = new Float32Array(starCount);
+
+        for (let i = 0; i < starCount; i++) {
+            // Distribute on a large sphere
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = 150 + Math.random() * 50;
+            starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            starPositions[i * 3 + 1] = Math.abs(r * Math.cos(phi)); // only upper hemisphere
+            starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+
+            // Slight color variation: blue-white to warm-white
+            const warmth = Math.random();
+            starColors[i * 3] = 0.8 + warmth * 0.2;
+            starColors[i * 3 + 1] = 0.85 + warmth * 0.1;
+            starColors[i * 3 + 2] = 1.0;
+
+            starSizes[i] = Math.random() < 0.05 ? 2.5 : 0.6 + Math.random() * 1.0;
+        }
+
+        const starGeo = new THREE.BufferGeometry();
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+        starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+
+        const starMat = new THREE.PointsMaterial({
+            size: 0.5,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true,
+            blending: THREE.AdditiveBlending
+        });
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        // ============================================
+        // 5. MOON
+        // ============================================
+        const moonGeo = new THREE.SphereGeometry(3.5, 32, 32);
+        const moonMat = new THREE.MeshBasicMaterial({
+            color: 0xddeeff,
+            transparent: true,
+            opacity: 0.15
+        });
+        const moon = new THREE.Mesh(moonGeo, moonMat);
+        moon.position.set(30, 35, -40);
+        scene.add(moon);
+
+        // Moon glow sprite
+        const moonGlowCanvas = document.createElement('canvas');
+        moonGlowCanvas.width = 256;
+        moonGlowCanvas.height = 256;
+        const mgCtx = moonGlowCanvas.getContext('2d');
+        const moonGrad = mgCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        moonGrad.addColorStop(0, 'rgba(200, 220, 255, 0.5)');
+        moonGrad.addColorStop(0.3, 'rgba(150, 180, 240, 0.15)');
+        moonGrad.addColorStop(1, 'rgba(100, 120, 200, 0)');
+        mgCtx.fillStyle = moonGrad;
+        mgCtx.fillRect(0, 0, 256, 256);
+        const moonGlowTexture = new THREE.CanvasTexture(moonGlowCanvas);
+        const moonGlowMat = new THREE.SpriteMaterial({
+            map: moonGlowTexture,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.8
+        });
+        const moonGlow = new THREE.Sprite(moonGlowMat);
+        moonGlow.position.copy(moon.position);
+        moonGlow.scale.set(30, 30, 1);
+        scene.add(moonGlow);
+
+        // ============================================
+        // 6. REALISTIC TREE — Geometry-Based Branches
+        // ============================================
+        const treeGroup = new THREE.Group();
+        scene.add(treeGroup);
+
+        // Bark material
+        const barkMat = new THREE.MeshStandardMaterial({
+            color: 0x2a1a0e,
+            roughness: 0.95,
+            metalness: 0.0,
+            emissive: 0x080402,
+            emissiveIntensity: 0.1
+        });
+
+        // Blossom particle arrays
+        const blossomPoints = [];
+        const blossomColors = [];
+        const blossomSizes = [];
+
+        const blossomPink = new THREE.Color(0xff69b4);
+        const blossomWhite = new THREE.Color(0xffeef5);
+        const blossomDeep = new THREE.Color(0xff1493);
+
+        function createBranch(start, direction, length, radius, depth, maxDepth) {
+            if (depth > maxDepth || radius < 0.01) return;
+
+            // Slight curve: subdivide each branch into segments
+            const segments = 6;
+            const segLength = length / segments;
+            let currentStart = start.clone();
+            let currentDir = direction.clone().normalize();
+
+            for (let s = 0; s < segments; s++) {
+                const t = s / segments;
+                const segRadius = radius * (1 - t * 0.4); // Taper
+
+                // Create cylinder segment
+                const cylGeo = new THREE.CylinderGeometry(
+                    segRadius * 0.85, segRadius, segLength, Math.max(3, Math.floor(8 - depth)), 1
+                );
+
+                const cyl = new THREE.Mesh(cylGeo, barkMat);
+                cyl.castShadow = true;
+                cyl.receiveShadow = true;
+
+                // Position & orient
+                const segEnd = currentStart.clone().add(currentDir.clone().multiplyScalar(segLength));
+                const midpoint = currentStart.clone().add(segEnd).multiplyScalar(0.5);
+                cyl.position.copy(midpoint);
+
+                // Orient cylinder along direction
+                const up = new THREE.Vector3(0, 1, 0);
+                const quat = new THREE.Quaternion().setFromUnitVectors(up, currentDir.clone().normalize());
+                cyl.quaternion.copy(quat);
+
+                treeGroup.add(cyl);
+
+                // Nudge direction slightly for organic curvature
+                currentDir.x += (Math.random() - 0.5) * 0.12;
+                currentDir.z += (Math.random() - 0.5) * 0.12;
+                currentDir.y += (Math.random() - 0.3) * 0.04;
+                currentDir.normalize();
+
+                currentStart = segEnd;
+            }
+
+            const endPoint = currentStart;
+
+            // Spawn blossoms along outer branches
+            if (depth >= maxDepth - 2) {
+                const clusterSize = depth >= maxDepth - 1 ? 20 : 10;
+                const spread = depth >= maxDepth - 1 ? 1.8 : 1.0;
+                for (let i = 0; i < clusterSize; i++) {
+                    const bx = endPoint.x + (Math.random() - 0.5) * spread;
+                    const by = endPoint.y + (Math.random() - 0.5) * spread * 0.7;
+                    const bz = endPoint.z + (Math.random() - 0.5) * spread;
+                    blossomPoints.push(bx, by, bz);
+
+                    const col = new THREE.Color();
+                    const pick = Math.random();
+                    if (pick < 0.3) col.copy(blossomDeep);
+                    else if (pick < 0.7) col.copy(blossomPink);
+                    else col.copy(blossomWhite);
+                    col.lerp(blossomPink, Math.random() * 0.3);
+                    col.multiplyScalar(0.7); // Moderate brightness
+                    blossomColors.push(col.r, col.g, col.b);
+                    blossomSizes.push(0.08 + Math.random() * 0.12);
+                }
+            }
+
+            // Branching
+            if (depth < maxDepth) {
+                const numChildren = depth < 2 ? 3 : (Math.random() < 0.4 ? 3 : 2);
+                for (let b = 0; b < numChildren; b++) {
+                    const spread = depth < 2 ? 0.6 : 0.9;
+                    const childDir = new THREE.Vector3(
+                        currentDir.x + (Math.random() - 0.4) * spread,
+                        currentDir.y * (0.6 + Math.random() * 0.4) + 0.15,
+                        currentDir.z + (Math.random() - 0.5) * spread
+                    ).normalize();
+
+                    const lengthFactor = 0.62 + Math.random() * 0.12;
+                    const radiusFactor = 0.55 + Math.random() * 0.1;
+
+                    createBranch(
+                        endPoint, childDir,
+                        length * lengthFactor,
+                        radius * radiusFactor,
+                        depth + 1, maxDepth
+                    );
+                }
+            }
+        }
+
+        // Build the tree
+        createBranch(
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 1, 0),
+            3.0,   // trunk length
+            0.55,  // trunk radius
+            0, 7   // depth 0 to maxDepth 7
+        );
+
+        // Blossom particle cloud
+        const blossomGeo = new THREE.BufferGeometry();
+        blossomGeo.setAttribute('position', new THREE.Float32BufferAttribute(blossomPoints, 3));
+        blossomGeo.setAttribute('color', new THREE.Float32BufferAttribute(blossomColors, 3));
+
+        // Custom circular soft particle texture
+        const blossomCanvas = document.createElement('canvas');
+        blossomCanvas.width = 64;
+        blossomCanvas.height = 64;
+        const bCtx = blossomCanvas.getContext('2d');
+        const bGrad = bCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        bGrad.addColorStop(0, 'rgba(255,255,255,1)');
+        bGrad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+        bGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        bCtx.fillStyle = bGrad;
+        bCtx.fillRect(0, 0, 64, 64);
+        const blossomTexture = new THREE.CanvasTexture(blossomCanvas);
+
+        const blossomMat = new THREE.PointsMaterial({
+            size: 0.22,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.7,
+            map: blossomTexture,
+            depthWrite: false,
+            blending: THREE.NormalBlending
+        });
+
+        const blossomCloud = new THREE.Points(blossomGeo, blossomMat);
+        scene.add(blossomCloud);
+
+        // ============================================
+        // 7. GROUND — Textured Plane + Fallen Petals
+        // ============================================
+        // Ground plane
+        const groundPlaneGeo = new THREE.CircleGeometry(18, 64);
+        const groundPlaneMat = new THREE.MeshBasicMaterial({
+            color: 0x0a0a12,
+            transparent: true,
+            opacity: 0.9
+        });
+        const groundPlane = new THREE.Mesh(groundPlaneGeo, groundPlaneMat);
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.position.y = -0.05;
+        groundPlane.receiveShadow = false;
+        scene.add(groundPlane);
+
+        // Scattered fallen petals on ground
+        const fallenCount = 1500;
+        const fallenPos = new Float32Array(fallenCount * 3);
+        const fallenCol = new Float32Array(fallenCount * 3);
+
+        for (let i = 0; i < fallenCount; i++) {
+            const rad = Math.pow(Math.random(), 0.6) * 12;
+            const theta = Math.random() * Math.PI * 2;
+            fallenPos[i * 3] = rad * Math.cos(theta);
+            fallenPos[i * 3 + 1] = 0.01 + Math.random() * 0.04;
+            fallenPos[i * 3 + 2] = rad * Math.sin(theta);
+
+            const col = new THREE.Color();
+            col.copy(blossomPink).lerp(blossomWhite, Math.random());
+            col.multiplyScalar(0.5 + Math.random() * 0.3); // dim them
+            fallenCol[i * 3] = col.r;
+            fallenCol[i * 3 + 1] = col.g;
+            fallenCol[i * 3 + 2] = col.b;
+        }
+
+        const fallenGeo = new THREE.BufferGeometry();
+        fallenGeo.setAttribute('position', new THREE.BufferAttribute(fallenPos, 3));
+        fallenGeo.setAttribute('color', new THREE.BufferAttribute(fallenCol, 3));
+        const fallenMat = new THREE.PointsMaterial({
+            size: 0.08,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.7,
+            map: blossomTexture,
+            depthWrite: false,
+            blending: THREE.NormalBlending
+        });
+        scene.add(new THREE.Points(fallenGeo, fallenMat));
+
+        // ============================================
+        // 8. WATER POND
+        // ============================================
+        const pondGeo = new THREE.CircleGeometry(4.5, 48);
+        const pondMat = new THREE.MeshStandardMaterial({
+            color: 0x1a3060,
+            roughness: 0.05,
+            metalness: 0.9,
+            transparent: true,
+            opacity: 0.8,
+            emissive: 0x051525,
+            emissiveIntensity: 0.3,
+            envMapIntensity: 2.0
+        });
+        const pond = new THREE.Mesh(pondGeo, pondMat);
+        pond.rotation.x = -Math.PI / 2;
+        pond.position.set(5, 0.02, 3);
+        pond.receiveShadow = true;
+        scene.add(pond);
+
+        // Subtle pond glow
+        const pondLight = new THREE.PointLight(0x3366aa, 0.4, 10);
+        pondLight.position.set(5, 0.3, 3);
+        scene.add(pondLight);
+
+        // ============================================
+        // 9. ROCKS around tree base
+        // ============================================
+        const rockMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            roughness: 0.9,
+            metalness: 0.0
+        });
+
+        for (let i = 0; i < 12; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 1.5 + Math.random() * 5;
+            const size = 0.15 + Math.random() * 0.4;
+
+            const rockGeo = new THREE.DodecahedronGeometry(size, 1);
+            // Deform vertices for organic look
+            const rockPositions = rockGeo.attributes.position;
+            for (let v = 0; v < rockPositions.count; v++) {
+                rockPositions.setX(v, rockPositions.getX(v) * (0.7 + Math.random() * 0.6));
+                rockPositions.setY(v, rockPositions.getY(v) * (0.5 + Math.random() * 0.5));
+                rockPositions.setZ(v, rockPositions.getZ(v) * (0.7 + Math.random() * 0.6));
+            }
+            rockGeo.computeVertexNormals();
+
+            const rock = new THREE.Mesh(rockGeo, rockMat);
+            rock.position.set(Math.cos(angle) * dist, size * 0.3, Math.sin(angle) * dist);
+            rock.rotation.set(Math.random(), Math.random(), Math.random());
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            scene.add(rock);
+        }
+
+        // ============================================
+        // 10. FALLING PETALS — Custom Mesh Petals
+        // ============================================
+        const petalCount = 500;
+        const petalMeshes = [];
+
+        // Petal shape: a curved, tear-drop like geometry
+        const petalShape = new THREE.Shape();
+        petalShape.moveTo(0, 0);
+        petalShape.quadraticCurveTo(0.04, 0.06, 0, 0.12);
+        petalShape.quadraticCurveTo(-0.04, 0.06, 0, 0);
+
+        const petalExtrudeSettings = { depth: 0.005, bevelEnabled: false };
+        const petalBaseGeo = new THREE.ExtrudeGeometry(petalShape, petalExtrudeSettings);
+        petalBaseGeo.center();
+
+        // Use instanced mesh for performance
+        const petalInstanceMat = new THREE.MeshStandardMaterial({
+            color: 0xffc0cb,
+            emissive: 0xff88aa,
+            emissiveIntensity: 0.08,
+            roughness: 0.7,
+            metalness: 0.0,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.85
+        });
+
+        const petalInstanceMesh = new THREE.InstancedMesh(petalBaseGeo, petalInstanceMat, petalCount);
+        petalInstanceMesh.castShadow = false;
+        scene.add(petalInstanceMesh);
+
+        const petalData = [];
+        const dummy = new THREE.Object3D();
+
+        for (let i = 0; i < petalCount; i++) {
+            const data = {
+                x: (Math.random() - 0.5) * 24,
+                y: Math.random() * 18 + 2,
+                z: (Math.random() - 0.5) * 24,
+                vy: 0.008 + Math.random() * 0.015,
+                vx: (Math.random() - 0.5) * 0.005,
+                rotSpeed: (Math.random() - 0.5) * 0.05,
+                rotX: Math.random() * Math.PI,
+                rotY: Math.random() * Math.PI,
+                rotZ: Math.random() * Math.PI,
+                swayPhase: Math.random() * Math.PI * 2,
+                swaySpeed: 0.8 + Math.random() * 1.5,
+                swayAmp: 0.005 + Math.random() * 0.01,
+                scale: 0.7 + Math.random() * 0.8
+            };
+            petalData.push(data);
+        }
+
+        function updatePetals(time) {
+            for (let i = 0; i < petalCount; i++) {
+                const d = petalData[i];
+
+                // Fall
+                d.y -= d.vy;
+                d.x += Math.sin(time * d.swaySpeed + d.swayPhase) * d.swayAmp;
+                d.z += Math.cos(time * d.swaySpeed * 0.7 + d.swayPhase) * d.swayAmp * 0.6;
+
+                // Tumble
+                d.rotX += d.rotSpeed * 0.3;
+                d.rotY += d.rotSpeed * 0.7;
+                d.rotZ += d.rotSpeed * 0.1;
+
+                // Reset when below ground
+                if (d.y < -0.5) {
+                    d.y = 15 + Math.random() * 5;
+                    d.x = (Math.random() - 0.5) * 20;
+                    d.z = (Math.random() - 0.5) * 20;
+                }
+
+                dummy.position.set(d.x, d.y, d.z);
+                dummy.rotation.set(d.rotX, d.rotY, d.rotZ);
+                dummy.scale.setScalar(d.scale);
+                dummy.updateMatrix();
+                petalInstanceMesh.setMatrixAt(i, dummy.matrix);
+            }
+            petalInstanceMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        // ============================================
+        // 11. FIREFLIES
+        // ============================================
+        const fireflyCount = 60;
+        const fireflyPositions = new Float32Array(fireflyCount * 3);
+        const fireflyData = [];
+
+        // Firefly glow texture
+        const ffCanvas = document.createElement('canvas');
+        ffCanvas.width = 64;
+        ffCanvas.height = 64;
+        const ffCtx = ffCanvas.getContext('2d');
+        const ffGrad = ffCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        ffGrad.addColorStop(0, 'rgba(255, 255, 200, 1)');
+        ffGrad.addColorStop(0.15, 'rgba(255, 230, 120, 0.8)');
+        ffGrad.addColorStop(0.5, 'rgba(200, 180, 50, 0.2)');
+        ffGrad.addColorStop(1, 'rgba(100, 80, 0, 0)');
+        ffCtx.fillStyle = ffGrad;
+        ffCtx.fillRect(0, 0, 64, 64);
+        const ffTexture = new THREE.CanvasTexture(ffCanvas);
+
+        for (let i = 0; i < fireflyCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 2 + Math.random() * 10;
+            fireflyPositions[i * 3] = Math.cos(angle) * dist;
+            fireflyPositions[i * 3 + 1] = 1 + Math.random() * 8;
+            fireflyPositions[i * 3 + 2] = Math.sin(angle) * dist;
+
+            fireflyData.push({
+                baseX: fireflyPositions[i * 3],
+                baseY: fireflyPositions[i * 3 + 1],
+                baseZ: fireflyPositions[i * 3 + 2],
+                phase: Math.random() * Math.PI * 2,
+                speed: 0.3 + Math.random() * 0.8,
+                radius: 0.5 + Math.random() * 1.5,
+                blinkPhase: Math.random() * Math.PI * 2,
+                blinkSpeed: 0.5 + Math.random() * 2.0
+            });
+        }
+
+        const fireflyGeo = new THREE.BufferGeometry();
+        fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPositions, 3));
+
+        const fireflyMat = new THREE.PointsMaterial({
+            size: 0.35,
+            map: ffTexture,
+            transparent: true,
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            color: 0xffee88
+        });
+
+        const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+        scene.add(fireflies);
+
+        // ============================================
+        // 12. PARTICLE DUST / MAGICAL MOTES
+        // ============================================
+        const dustCount = 1200;
+        const dustPositions = new Float32Array(dustCount * 3);
+        const dustData = [];
+
+        for (let i = 0; i < dustCount; i++) {
+            dustPositions[i * 3] = (Math.random() - 0.5) * 30;
+            dustPositions[i * 3 + 1] = Math.random() * 15;
+            dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+            dustData.push({
+                speed: 0.001 + Math.random() * 0.003,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        const dustGeo = new THREE.BufferGeometry();
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+        const dustMat = new THREE.PointsMaterial({
+            size: 0.04,
+            color: 0xccbbee,
+            transparent: true,
+            opacity: 0.35,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const dust = new THREE.Points(dustGeo, dustMat);
+        scene.add(dust);
+
+        // ============================================
+        // 13. ANIMATION LOOP
+        // ============================================
+        const clock = new THREE.Clock();
+
+        // Fade out overlay
+        setTimeout(() => {
+            document.getElementById('overlay').classList.add('fade');
+        }, 5000);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            controls.update();
+
+            // --- Falling Petals ---
+            updatePetals(time);
+
+            // --- Fireflies ---
+            const ffPos = fireflies.geometry.attributes.position.array;
+            for (let i = 0; i < fireflyCount; i++) {
+                const d = fireflyData[i];
+                ffPos[i * 3] = d.baseX + Math.sin(time * d.speed + d.phase) * d.radius;
+                ffPos[i * 3 + 1] = d.baseY + Math.sin(time * d.speed * 1.3 + d.phase * 2) * 0.8;
+                ffPos[i * 3 + 2] = d.baseZ + Math.cos(time * d.speed * 0.8 + d.phase) * d.radius;
+            }
+            fireflies.geometry.attributes.position.needsUpdate = true;
+
+            // Firefly blinking effect through opacity modulation
+            const avgBlink = fireflyData.reduce((sum, d) => {
+                return sum + (0.5 + 0.5 * Math.sin(time * d.blinkSpeed + d.blinkPhase));
+            }, 0) / fireflyCount;
+            fireflyMat.opacity = 0.4 + avgBlink * 0.6;
+
+            // --- Dust particles drift ---
+            const dPos = dust.geometry.attributes.position.array;
+            for (let i = 0; i < dustCount; i++) {
+                dPos[i * 3 + 1] += dustData[i].speed;
+                dPos[i * 3] += Math.sin(time * 0.3 + dustData[i].phase) * 0.002;
+                if (dPos[i * 3 + 1] > 15) {
+                    dPos[i * 3 + 1] = 0;
+                    dPos[i * 3] = (Math.random() - 0.5) * 30;
+                    dPos[i * 3 + 2] = (Math.random() - 0.5) * 30;
+                }
+            }
+            dust.geometry.attributes.position.needsUpdate = true;
+
+            // --- Blossom cloud subtle pulse ---
+            blossomMat.opacity = 0.75 + Math.sin(time * 0.8) * 0.15;
+
+            // --- Gentle tree sway ---
+            treeGroup.rotation.z = Math.sin(time * 0.4) * 0.008;
+            treeGroup.rotation.x = Math.cos(time * 0.3) * 0.005;
+            blossomCloud.rotation.z = Math.sin(time * 0.4) * 0.008;
+            blossomCloud.rotation.x = Math.cos(time * 0.3) * 0.005;
+
+            // --- Pond shimmer ---
+            pond.material.roughness = 0.03 + Math.sin(time * 1.5) * 0.02;
+
+            // --- Subtle light breathing ---
+            baseGlow.intensity = 0.3 + Math.sin(time * 0.5) * 0.1;
+            rimLight.intensity = 0.4 + Math.sin(time * 0.7 + 1) * 0.1;
+
+            // --- Render ---
+            composer.render();
+        }
+
+        animate();
+
+        // ============================================
+        // 14. RESIZE HANDLER
+        // ============================================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Disable auto-rotate on user interaction
+        renderer.domElement.addEventListener('pointerdown', () => {
+            controls.autoRotate = false;
+        });
+    </script>
+</body>
+
+</html>

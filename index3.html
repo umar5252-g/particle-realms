@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethereal Glowing Cherry Tree</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #020106;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            pointer-events: none;
+            background: rgba(10, 5, 20, 0.4);
+            padding: 8px 18px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui">✦ Click & Drag to Explore ✦</div>
+
+    <!-- Three.js and Post-Processing Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <script>
+        // --- 1. SETUP SCENE, CAMERA & RENDERER ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020106, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02; // Keep camera above ground
+        controls.minDistance = 6;
+        controls.maxDistance = 35;
+        controls.target.set(0, 4, 0);
+
+        // --- 2. UNREAL BLOOM POST-PROCESSING ---
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            2.0,  // Bloom Strength (Vivid glow)
+            0.5,  // Bloom Radius
+            0.1   // Threshold
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- 3. RECURSIVE GLOWING TREE ---
+        const treePoints = [];
+        const treeColors = [];
+
+        // Color Palette
+        const trunkCol = new THREE.Color(0xff8833);   // Warm amber trunk
+        const blossomBase = new THREE.Color(0xff007f); // Deep pink
+        const blossomMid = new THREE.Color(0xff77aa);  // Cherry blossom pink
+        const blossomTip = new THREE.Color(0x88ffff);  // Glowing cyan accent tips
+
+        function createBranch(start, length, radius, angleX, angleY, depth) {
+            const end = new THREE.Vector3(
+                start.x + length * Math.sin(angleX) * Math.cos(angleY),
+                start.y + length * Math.cos(angleX),
+                start.z + length * Math.sin(angleX) * Math.sin(angleY)
+            );
+
+            const steps = Math.floor(length * 25);
+            for (let i = 0; i < steps; i++) {
+                const t = i / steps;
+                const p = new THREE.Vector3().lerpVectors(start, end, t);
+
+                // Add volumetric thickness
+                const r = radius * (1 - t * 0.5) * (0.8 + Math.random() * 0.4);
+                p.x += (Math.random() - 0.5) * r;
+                p.y += (Math.random() - 0.5) * r;
+                p.z += (Math.random() - 0.5) * r;
+
+                treePoints.push(p.x, p.y, p.z);
+
+                // Blend colors down the branch hierarchy
+                let c = new THREE.Color();
+                if (depth < 2) {
+                    c.copy(trunkCol).lerp(blossomBase, depth / 2);
+                } else {
+                    c.copy(blossomBase).lerp(blossomMid, Math.random());
+                }
+                treeColors.push(c.r, c.g, c.b);
+            }
+
+            // Split into smaller branches or form dense blossom clouds
+            if (depth < 5) {
+                const branchCount = Math.floor(Math.random() * 2) + 2;
+                for (let b = 0; b < branchCount; b++) {
+                    const nextAngleX = angleX + (Math.random() - 0.35) * 0.85;
+                    const nextAngleY = angleY + (Math.random() - 0.5) * 1.6;
+                    createBranch(end, length * 0.73, radius * 0.65, nextAngleX, nextAngleY, depth + 1);
+                }
+            } else {
+                // Leaf/Blossom cluster endpoints
+                for (let p = 0; p < 50; p++) {
+                    const bp = new THREE.Vector3(
+                        end.x + (Math.random() - 0.5) * 2.2,
+                        end.y + (Math.random() - 0.5) * 2.2,
+                        end.z + (Math.random() - 0.5) * 2.2
+                    );
+                    treePoints.push(bp.x, bp.y, bp.z);
+
+                    let col = blossomMid.clone().lerp(blossomTip, Math.random() > 0.85 ? 0.9 : Math.random() * 0.3);
+                    treeColors.push(col.r, col.g, col.b);
+                }
+            }
+        }
+
+        // Generate Tree
+        createBranch(new THREE.Vector3(0, -1, 0), 4.8, 0.9, 0, 0, 0);
+
+        const treeGeo = new THREE.BufferGeometry();
+        treeGeo.setAttribute('position', new THREE.Float32BufferAttribute(treePoints, 3));
+        treeGeo.setAttribute('color', new THREE.Float32BufferAttribute(treeColors, 3));
+
+        const treeMat = new THREE.PointsMaterial({
+            size: 0.11,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.88,
+            blending: THREE.AdditiveBlending
+        });
+
+        const tree = new THREE.Points(treeGeo, treeMat);
+        scene.add(tree);
+
+        // --- 4. GLOWING TERRAIN FIELD ---
+        const terrainCount = 4000;
+        const terrainPos = [];
+        const terrainCol = [];
+
+        for (let i = 0; i < terrainCount; i++) {
+            const rad = Math.random() * 18;
+            const theta = Math.random() * Math.PI * 2;
+            const x = rad * Math.cos(theta);
+            const z = rad * Math.sin(theta);
+            // Slight wave hill terrain shape
+            const y = -1.2 + Math.sin(x * 0.3) * 0.2 + Math.cos(z * 0.3) * 0.2;
+
+            terrainPos.push(x, y, z);
+
+            const gCol = blossomBase.clone().lerp(new THREE.Color(0x220055), rad / 18);
+            terrainCol.push(gCol.r, gCol.g, gCol.b);
+        }
+
+        const terrainGeo = new THREE.BufferGeometry();
+        terrainGeo.setAttribute('position', new THREE.Float32BufferAttribute(terrainPos, 3));
+        terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(terrainCol, 3));
+
+        const terrainMat = new THREE.PointsMaterial({
+            size: 0.09,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+
+        scene.add(new THREE.Points(terrainGeo, terrainMat));
+
+        // --- 5. SWAYING FALLING PETALS ---
+        const petalCount = 1200;
+        const petalGeo = new THREE.BufferGeometry();
+        const petalPos = new Float32Array(petalCount * 3);
+        const petalData = [];
+
+        for (let i = 0; i < petalCount; i++) {
+            petalPos[i * 3] = (Math.random() - 0.5) * 22;
+            petalPos[i * 3 + 1] = Math.random() * 14;
+            petalPos[i * 3 + 2] = (Math.random() - 0.5) * 22;
+
+            petalData.push({
+                speedY: Math.random() * 0.02 + 0.008,
+                swaySpeed: Math.random() * 1.5 + 0.5,
+                swayRadius: Math.random() * 0.02 + 0.005,
+                offset: Math.random() * Math.PI * 2
+            });
+        }
+
+        petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+
+        const petalMat = new THREE.PointsMaterial({
+            color: 0xffb3da,
+            size: 0.14,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending
+        });
+
+        const petals = new THREE.Points(petalGeo, petalMat);
+        scene.add(petals);
+
+        // --- 6. FLOATING FIREFLIES (LIGHT ORBS) ---
+        const fireflyCount = 45;
+        const fireflyGeo = new THREE.BufferGeometry();
+        const fireflyPos = new Float32Array(fireflyCount * 3);
+        const fireflyData = [];
+
+        for (let i = 0; i < fireflyCount; i++) {
+            fireflyPos[i * 3] = (Math.random() - 0.5) * 16;
+            fireflyPos[i * 3 + 1] = Math.random() * 8 + 0.5;
+            fireflyPos[i * 3 + 2] = (Math.random() - 0.5) * 16;
+
+            fireflyData.push({
+                angle: Math.random() * Math.PI * 2,
+                speed: Math.random() * 0.01 + 0.005,
+                heightSpeed: Math.random() * 0.02 + 0.01,
+                radius: Math.random() * 6 + 2
+            });
+        }
+
+        fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+
+        const fireflyMat = new THREE.PointsMaterial({
+            color: 0x77ffff,
+            size: 0.28,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+
+        const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+        scene.add(fireflies);
+
+        // --- 7. ANIMATION & RENDER LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            controls.update();
+
+            // Animate Petals
+            const pArr = petals.geometry.attributes.position.array;
+            for (let i = 0; i < petalCount; i++) {
+                const d = petalData[i];
+                pArr[i * 3 + 1] -= d.speedY;
+                pArr[i * 3] += Math.sin(time * d.swaySpeed + d.offset) * d.swayRadius;
+                pArr[i * 3 + 2] += Math.cos(time * d.swaySpeed + d.offset) * d.swayRadius;
+
+                // Recycle to top
+                if (pArr[i * 3 + 1] < -1.2) {
+                    pArr[i * 3 + 1] = 14;
+                    pArr[i * 3] = (Math.random() - 0.5) * 22;
+                    pArr[i * 3 + 2] = (Math.random() - 0.5) * 22;
+                }
+            }
+            petals.geometry.attributes.position.needsUpdate = true;
+
+            // Animate Floating Fireflies
+            const fArr = fireflies.geometry.attributes.position.array;
+            for (let i = 0; i < fireflyCount; i++) {
+                const fd = fireflyData[i];
+                fd.angle += fd.speed;
+                fArr[i * 3] += Math.cos(fd.angle) * 0.02;
+                fArr[i * 3 + 1] += Math.sin(time * fd.heightSpeed) * 0.01;
+                fArr[i * 3 + 2] += Math.sin(fd.angle) * 0.02;
+            }
+            fireflies.geometry.attributes.position.needsUpdate = true;
+
+            // Gentle Breathing Tree Sway
+            tree.rotation.y = Math.sin(time * 0.15) * 0.025;
+
+            composer.render();
+        }
+
+        animate();
+
+        // Responsive Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
